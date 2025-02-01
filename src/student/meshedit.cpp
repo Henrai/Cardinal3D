@@ -497,7 +497,53 @@ void Halfedge_Mesh::bevel_face_positions(const std::vector<Vec3>& start_position
 void Halfedge_Mesh::triangulate() {
 
     // For each face...
-}
+    for(FaceRef f = faces_begin(); f != faces_end(); f++) {
+        if(f->degree() == 3) continue;
+        HalfedgeRef h = f->halfedge();
+        VertexRef v0 = h->vertex();
+        HalfedgeRef h1 = h;
+        HalfedgeRef h2 = h1->next();
+
+        while(h2->next()->next()!= h) {
+            HalfedgeRef half_edge = new_halfedge();
+            HalfedgeRef half_edge_twin = new_halfedge();
+            HalfedgeRef halfe_edge_next = h2->next(); 
+            
+            EdgeRef e = new_edge();
+
+            FaceRef nf = new_face();
+            VertexRef v2 = h2->next()->vertex();
+
+            half_edge->set_neighbors(h1, half_edge_twin, v2, e, nf);
+            
+            half_edge_twin->twin() = half_edge;
+            half_edge_twin->edge() = e;
+            half_edge_twin->vertex() = v0;
+            half_edge_twin->next() = halfe_edge_next;
+            
+            
+            
+            h2->face() = nf;
+            h1->face() = nf;
+            h2->next() = half_edge;
+            nf->halfedge() = h1;
+            e->halfedge() = half_edge;
+
+            h1 = half_edge_twin;
+            h2 = halfe_edge_next;
+        }
+
+        FaceRef nf = new_face();
+        h1->face() = nf;
+        h2->face() = nf;
+        h2->next()->next() = h1;
+        h2->next()->face() = nf;
+        nf->halfedge() = h1;
+        
+        erase(f);
+        
+    }
+ }
 
 /* Note on the quad subdivision process:
 
