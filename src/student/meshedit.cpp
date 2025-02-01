@@ -618,14 +618,15 @@ void Halfedge_Mesh::linear_subdivide_positions() {
     // that in general, NOT all faces will be triangles!
     for(FaceRef f = faces_begin(); f != faces_end(); f++) {
         HalfedgeRef h = f->halfedge();
-        Vec3 centroid = Vec3();
-        int count = 0;
-        do {
-            centroid += h->vertex()->pos;
-            count++;
+        Vec3 new_pos = Vec3();
+        int cnt = 0;
+        
+        do{
+            new_pos += h->vertex()->pos;
+            cnt++;
             h = h->next();
-        } while(h != f->halfedge());
-        f->new_pos = centroid / count;
+        }while(h!= f->halfedge());
+        f->new_pos = new_pos / cnt;
     }
 }
 
@@ -648,10 +649,43 @@ void Halfedge_Mesh::catmullclark_subdivide_positions() {
     // rules. (These rules are outlined in the Developer Manual.)
 
     // Faces
-
+    for (FaceRef f = faces_begin(); f != faces_end(); f++) {
+        HalfedgeRef h = f->halfedge();
+        Vec3 new_pos = Vec3();
+        int cnt = 0;
+        do{
+            new_pos += h->vertex()->pos;
+            cnt++;
+            h = h->next();
+        }while(h != f->halfedge());
+        f->new_pos = new_pos / cnt;
+    }
     // Edges
+    for (EdgeRef e = edges_begin(); e != edges_end(); e++) {
+        HalfedgeRef h0 = e->halfedge();
+        HalfedgeRef h1 = h0->twin();
+        e->new_pos = (h0->vertex()->pos 
+                    + h1->vertex()->pos 
+                    + h0->face()->new_pos 
+                    + h1->face()->new_pos) / 4;
+    }
 
     // Vertices
+    for (VertexRef v = vertices_begin(); v != vertices_end(); v++) {
+        HalfedgeRef h = v->halfedge();
+        Vec3 Q = Vec3();
+        Vec3 R = Vec3();
+        float n = 0;
+        do {
+            Q += h->face()->new_pos;
+            R += h->edge()->new_pos;
+            n++;
+            h = h->twin()->next();
+        } while(h != v->halfedge());
+        Q /= n;
+        R /= n;
+        v->new_pos = (Q + 2 * R + (n - 3) * v->pos) / n;
+    }
 }
 
 /*
