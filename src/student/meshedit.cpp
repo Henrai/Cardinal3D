@@ -143,80 +143,12 @@ std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(Halfedge_Mesh::Ed
 std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::split_edge(Halfedge_Mesh::EdgeRef e) {
 
     if (e->on_boundary()) {
-         /*
-              v0         v0
-             / |        / |
-            v1 |  -->  v1-v3
-             \ |        \ |
-              v2         v2
-        */
-        HalfedgeRef h0 = e->halfedge();
-        HalfedgeRef h1 = h0->next();
-        HalfedgeRef h2 = h1->next();
-        HalfedgeRef ht = h0->twin();
-
-        HalfedgeRef h3 = new_halfedge();
-        HalfedgeRef h4 = new_halfedge();
-        HalfedgeRef h5 = new_halfedge();
-        HalfedgeRef h6 = new_halfedge();
-        HalfedgeRef h7 = new_halfedge();
-        HalfedgeRef h8 = new_halfedge();
-        HalfedgeRef h9 = ht->next();
-        
-        HalfedgeRef ht_pre = ht;
-        while(ht_pre->next() != ht) {
-            ht_pre = ht_pre->next();
-        }
-
-        EdgeRef e0 = new_edge();
-        EdgeRef e1 = new_edge();
-        EdgeRef e2 = new_edge();
-
-        VertexRef v0 = h1->vertex();
-        VertexRef v1 = h2->vertex();
-        VertexRef v2 = h0->vertex();
-        VertexRef v3 = new_vertex();
-
-        v3->pos = (v0->pos + v2->pos) / 2;
-
-        FaceRef old_face = h0->face();
-        FaceRef twin_face = ht->face();
-
-        FaceRef f0 = new_face();
-        FaceRef f1 = new_face();
-
-        h1->set_neighbors(h4, h1->twin(), h1->vertex(), h1->edge(), f0);
-        h4->set_neighbors(h3, h5, v1, e1, f0);
-        h3->set_neighbors(h1, h7, v3, e0, f0);
-
-        h2->set_neighbors(h6, h2->twin(), h2->vertex(), h2->edge(), f1);
-        h6->set_neighbors(h5, h8, v2, e2, f1);
-        h5->set_neighbors(h2, h4, v3, e1, f1);
-        h7->set_neighbors(h8, h3, v0, e0, twin_face);
-        h8->set_neighbors(h9, h6, v3, e2, twin_face);
-        ht_pre->next() = h7;
-        
-        e0->halfedge() = h3;
-        e1->halfedge() = h5;
-        e2->halfedge() = h6;
-
-        f0->halfedge() = h3;
-        f1->halfedge() = h5;
-        twin_face->halfedge() = h7;
-
-        v0->halfedge() = h1;
-        v1->halfedge() = h2;
-        v2->halfedge() = h6;
-        v3->halfedge() = h3;
-        
-        erase(ht);
-        erase(h0);
-        erase(e);
-        erase(old_face);
-        
-        return v3;
+        return split_edge_boundary(e);
     }
+    return split_edge_non_boundary(e);
+}
 
+std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::split_edge_non_boundary(Halfedge_Mesh::EdgeRef e) {
     /*
                v0            v0
              / | \         / | \
@@ -310,7 +242,85 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::split_edge(Halfedge_Mesh:
     erase(old_f1);
 
     return v5;
+}
 
+std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::split_edge_boundary(Halfedge_Mesh::EdgeRef e) {
+    /*
+          v0         v0
+         / |        / |
+        v1 |  -->  v1-v3
+         \ |        \ |
+          v2         v2
+    */
+    if (!e->on_boundary()) {
+        return std::nullopt;
+    }
+
+    HalfedgeRef h0 = e->halfedge();
+    HalfedgeRef h1 = h0->next();
+    HalfedgeRef h2 = h1->next();
+    HalfedgeRef ht = h0->twin();
+
+    HalfedgeRef h3 = new_halfedge();
+    HalfedgeRef h4 = new_halfedge();
+    HalfedgeRef h5 = new_halfedge();
+    HalfedgeRef h6 = new_halfedge();
+    HalfedgeRef h7 = new_halfedge();
+    HalfedgeRef h8 = new_halfedge();
+    HalfedgeRef h9 = ht->next();
+        
+    HalfedgeRef ht_pre = ht;
+    while(ht_pre->next() != ht) {
+        ht_pre = ht_pre->next();
+    }
+
+    EdgeRef e0 = new_edge();
+    EdgeRef e1 = new_edge();
+    EdgeRef e2 = new_edge();
+
+    VertexRef v0 = h1->vertex();
+    VertexRef v1 = h2->vertex();
+    VertexRef v2 = h0->vertex();
+    VertexRef v3 = new_vertex();
+
+    v3->pos = (v0->pos + v2->pos) / 2;
+
+    FaceRef old_face = h0->face();
+    FaceRef twin_face = ht->face();
+
+    FaceRef f0 = new_face();
+    FaceRef f1 = new_face();
+
+    h1->set_neighbors(h4, h1->twin(), h1->vertex(), h1->edge(), f0);
+    h4->set_neighbors(h3, h5, v1, e1, f0);
+    h3->set_neighbors(h1, h7, v3, e0, f0);
+
+    h2->set_neighbors(h6, h2->twin(), h2->vertex(), h2->edge(), f1);
+    h6->set_neighbors(h5, h8, v2, e2, f1);
+    h5->set_neighbors(h2, h4, v3, e1, f1);
+    h7->set_neighbors(h8, h3, v0, e0, twin_face);
+    h8->set_neighbors(h9, h6, v3, e2, twin_face);
+    ht_pre->next() = h7;
+        
+    e0->halfedge() = h3;
+    e1->halfedge() = h5;
+    e2->halfedge() = h6;
+
+    f0->halfedge() = h3;
+    f1->halfedge() = h5;
+    twin_face->halfedge() = h7;
+
+    v0->halfedge() = h1;
+    v1->halfedge() = h2;
+    v2->halfedge() = h6;
+    v3->halfedge() = h3;
+        
+    erase(ht);
+    erase(h0);
+    erase(e);
+    erase(old_face);
+        
+    return v3;
 }
 
 /* Note on the beveling process:
@@ -657,7 +667,7 @@ void Halfedge_Mesh::catmullclark_subdivide_positions() {
             new_pos += h->vertex()->pos;
             cnt++;
             h = h->next();
-        }while(h != f->halfedge());
+        } while(h != f->halfedge());
         f->new_pos = new_pos / cnt;
     }
     // Edges

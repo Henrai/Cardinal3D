@@ -229,6 +229,8 @@ public:
         mesh
     */
     std::optional<VertexRef> split_edge(EdgeRef e);
+    std::optional<VertexRef> split_edge_non_boundary(EdgeRef h);
+    std::optional<VertexRef> split_edge_boundary(EdgeRef h);
 
     /*
         Creates a face in place of the vertex, returning a pointer to the new face
