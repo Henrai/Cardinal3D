@@ -57,8 +57,74 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::erase_edge(Halfedge_Mesh::E
 */
 std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Mesh::EdgeRef e) {
 
-    (void)e;
-    return std::nullopt;
+    /*
+       A - H - I              A-H-I 
+      / \ / \ / \            / \|/ \ 
+     B---F-- K--J     -->   B---N---J
+      \ / \ / \ /            \ /|\ / 
+       D - L - E              D-L-E
+    */
+
+    HalfedgeRef start_edges[2] = {e->halfedge(), e->halfedge()->twin()};
+    VertexRef start_vertices[2] = {start_edges[0]->vertex(), start_edges[1]->vertex()};
+    VertexRef v0 = new_vertex();
+    v0->pos = (start_vertices[0]->pos + start_vertices[1]->pos) / 2;
+
+    for(auto i: start_vertices) {
+        HalfedgeRef h = i->halfedge();
+        do {
+            h->vertex() = v0;
+            h = h->twin()->next();
+        } while(h != i->halfedge());
+        erase(i);
+    }
+    
+    for(auto i : start_edges) {
+        FaceRef face = i->face();
+        if(face->degree() == 3) {
+            HalfedgeRef h0 = i;
+            HalfedgeRef h1 = h0->next();
+            HalfedgeRef h2 = h1->next();
+            HalfedgeRef h1_t = h1->twin();
+            HalfedgeRef h2_t = h2->twin();
+            
+            EdgeRef e1 = h1->edge();
+            EdgeRef e2 = h2->edge();
+
+            FaceRef f = h0->face();
+
+            e1->halfedge() = h1_t;
+            h1_t->twin() = h2_t;
+            h2_t->twin() = h1_t;
+            v0->halfedge() = h2_t;
+            h2_t->edge() = e1;
+            h1->vertex()->halfedge() = h2_t;
+            h2->vertex()->halfedge() = h1_t;
+
+            erase(f);
+            erase(h1);
+            erase(h2);
+            erase(e2);
+        } else {
+            HalfedgeRef h0 = i;
+            HalfedgeRef h1 = h0->next();
+            HalfedgeRef pre = i;
+            while (pre->next() != i) {
+                pre = pre->next();
+            }
+            pre->next() = h1;
+            h1->vertex()->halfedge() = h1;
+            h1->face()->halfedge() = h1;
+        }
+    }
+    
+    erase(e);
+    erase(start_vertices[0]);
+    erase(start_vertices[1]);
+    erase(start_edges[0]);
+    erase(start_edges[1]);
+    
+    return v0;
 }
 
 /*
