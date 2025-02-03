@@ -856,6 +856,13 @@ struct Edge_Record {
         //    Edge_Record::optimal.
         // -> Also store the cost associated with collapsing this edge in
         //    Edge_Record::cost.
+
+        Halfedge_Mesh::VertexRef v0 = e->halfedge()->vertex();
+        Halfedge_Mesh::VertexRef v1 = e->halfedge()->twin()->vertex();
+        Mat4 K = vertex_quadrics[v0] + vertex_quadrics[v1];
+
+        optimal = K.inverse() *  Vec3(-K[0][3], -K[1][3], -K[2][3]);
+        cost = dot(Vec4(optimal, 1) , K * Vec4(optimal, 1));
     }
     Halfedge_Mesh::EdgeRef edge;
     Vec3 optimal;
@@ -983,5 +990,88 @@ bool Halfedge_Mesh::simplify() {
     // but here simply calling collapse_edge() will not erase the elements.
     // You should use collapse_edge_erase() instead for the desired behavior.
 
-    return false;
+    size_t face_count = faces.size();
+
+    auto update_face = [&face_quadrics](const FaceRef& f) {
+        Vec3 n = f->normal();
+        Vec3 p = f->halfedge()->vertex()->pos;
+        float d = -dot(n, p);
+        Vec4 v = Vec4(n.x, n.y, n.z, d);
+        Mat4 q = outer(v, v);
+        face_quadrics[f] = q;
+    };
+
+    auto update_vertex = [&](const VertexRef& v) {
+        Mat4 q = Mat4::Zero;
+        HalfedgeRef h = v->halfedge();
+        do {
+            update_face(h->face());
+            q += face_quadrics[h->face()];
+            h = h->twin()->next();
+        } while(h != v->halfedge());
+        vertex_quadrics[v] = q;
+    };
+
+    auto update_edge = [&](const EdgeRef& e) {
+        edge_records[e] = Edge_Record(vertex_quadrics, e);
+        edge_queue.insert(edge_records[e]);
+    };
+
+    for (FaceRef f = faces_begin(); f != faces_end(); f++) {
+        update_face(f);
+    }
+
+    for (VertexRef v = vertices_begin(); v != vertices_end(); v++) {
+        update_vertex(v);
+    }
+
+    for (EdgeRef e = edges_begin(); e != edges_end(); e++) {
+       update_edge(e);
+    }
+
+    while(faces.size() > face_count / 4) {
+        Edge_Record er = edge_queue.top();
+        edge_queue.pop();
+        EdgeRef e = er.edge;
+
+        VertexRef v0[2] = { e->halfedge()->vertex(),  e->halfedge()->twin()->vertex()};
+        for (VertexRef v : v0) {
+            HalfedgeRef h = v->halfedge();
+            do {
+                edge_queue.remove(edge_records[h->edge()]);
+                h = h->twin()->next();
+            } while(h != v->halfedge());
+        }
+        edge_records.erase(e);
+        vertex_quadrics.erase(v0[0]);
+        vertex_quadrics.erase(v0[1]);
+        auto v_container = collapse_edge_erase(e);
+        if(!v_container.has_value()) {
+            return false;
+        }
+
+        VertexRef v = v_container.value();
+        v->pos = er.optimal;
+
+        HalfedgeRef hi = v->halfedge();
+        do {
+            update_face(hi->face());
+            hi = hi->twin()->next();
+        } while(hi != v->halfedge());
+
+        update_vertex(v);
+        hi = v->halfedge();
+        do {
+            update_vertex(hi->twin()->vertex());
+            hi = hi->twin()->next();
+        } while(hi != v->halfedge());
+
+        hi = v->halfedge();
+        do {
+            update_edge(hi->edge());
+            hi = hi->twin()->next();
+        } while (hi != v->halfedge());
+    
+    }
+    return true;
 }
