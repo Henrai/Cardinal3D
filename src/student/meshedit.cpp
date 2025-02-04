@@ -1073,5 +1073,9 @@ bool Halfedge_Mesh::simplify() {
         } while (hi != v->halfedge());
     
     }
+    vertex_quadrics.clear();
+    face_quadrics.clear();
+    edge_records.clear();
+    edge_queue.queue.clear();
     return true;
 }
