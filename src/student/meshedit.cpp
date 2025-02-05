@@ -913,7 +913,12 @@ void Halfedge_Mesh::loop_subdivide() {
     // will then assign vertex positions in
     // the new mesh based on the values we computed for the original mesh.
     
-
+    for (auto face = faces_begin(); face != faces_end(); face++) {
+        if (face->degree() != 3) {
+            std::cerr << "Loop subdivision is only for triangle mesh" << std::endl;
+            return;
+        }
+    }
     // Compute updated positions for all the vertices in the original mesh, using
     // the Loop subdivision rule.
 
@@ -998,8 +1003,67 @@ bool Halfedge_Mesh::isotropic_remesh() {
     // The rest of the codebase will automatically call validate() after each op,
     // but here simply calling collapse_edge() will not erase the elements.
     // You should use collapse_edge_erase() instead for the desired behavior.
+    for(auto face = faces_begin(); face != faces_end(); face++) {
+        if(face->degree() != 3) {
+            return false;
+        }
+    }
+    std::cout << "start" << std::endl;
 
-    return false;
+    float n = edges.size();
+    float mean_length = 0;
+    for (auto edge = edges_begin(); edge != edges_end(); edge++) {
+       mean_length += edge->length()/n;
+    }
+    std::cout << "mean_length: " << mean_length << std::endl;
+    EdgeRef edge = edges_begin();
+    for(int i = 0; i < n; i++) {
+        if(edge->length() > 4 * mean_length / 3) {
+            split_edge(edge);
+        }
+        edge++;
+    }
+    std::cout << "split done" << std::endl;
+    // edge = edges_begin();
+    // for(int i = 0; i < n; i++) {
+    //     if(edge->length() < 4 * mean_length / 5) {
+    //         collapse_edge_erase(edge);
+    //     }
+    //     edge++;
+    // }
+    std::cout<< "collapse done" << std::endl;
+    for(auto e = edges_begin(); e != edges_end(); e++) {
+        std::cout<<e->id() << std::endl;
+        HalfedgeRef h0 = e->halfedge();
+        HalfedgeRef h1 = h0->twin();
+        VertexRef v0 = h0->vertex();
+        VertexRef v1 = h1->vertex();
+        VertexRef v2 = h0->next()->twin()->vertex();
+        VertexRef v3 = h1->next()->twin()->vertex();
+        int d0 = v0->degree();
+        int d1 = v1->degree();
+        int d2 = v2->degree();
+        int d3 = v3->degree();
+        int cur_dev = abs(d0 - 6) + abs(d1 - 6) + abs(d2 - 6) + abs(d3 - 6);
+        int new_dev = abs(d0 - 7) + abs(d1 - 7) + abs(d2 - 5) + abs(d3 - 5);
+        if(new_dev < cur_dev) {
+            flip_edge(e);
+        }
+        std::cout<< "??" << std::endl;
+    }
+    std::cout << "flip done" << std::endl;
+    for (VertexRef v = vertices_begin(); v != vertices_end(); v++) {
+        Vec3 c = v->neighborhood_center();
+        Vec3 p = v->pos;
+        v->new_pos = p + 0.2f * (c - p);
+    }
+    std::cout << "smooth done" << std::endl;
+
+    for(VertexRef v = vertices_begin(); v != vertices_end(); v++) {
+        v->pos = v->new_pos;
+    }
+    std::cout << "end" << std::endl;
+    return true;
 }
 
 /* Helper type for quadric simplification */
@@ -1152,6 +1216,9 @@ bool Halfedge_Mesh::simplify() {
     // You should use collapse_edge_erase() instead for the desired behavior.
 
     size_t face_count = faces.size();
+    if(face_count < 32) {
+        return false;
+    }
 
     auto update_face = [&face_quadrics](const FaceRef& f) {
         Vec3 n = f->normal();
