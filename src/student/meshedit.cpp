@@ -879,14 +879,12 @@ bool Halfedge_Mesh::isotropic_remesh() {
             return false;
         }
     }
-    std::cout << "start" << std::endl;
 
     float n = edges.size();
     float mean_length = 0;
     for (auto edge = edges_begin(); edge != edges_end(); edge++) {
        mean_length += edge->length()/n;
     }
-    std::cout << "mean_length: " << mean_length << std::endl;
     EdgeRef edge = edges_begin();
     for(int i = 0; i < n; i++) {
         if(edge->length() > 4 * mean_length / 3) {
@@ -894,17 +892,18 @@ bool Halfedge_Mesh::isotropic_remesh() {
         }
         edge++;
     }
-    std::cout << "split done" << std::endl;
-    // edge = edges_begin();
-    // for(int i = 0; i < n; i++) {
-    //     if(edge->length() < 4 * mean_length / 5) {
-    //         collapse_edge_erase(edge);
-    //     }
-    //     edge++;
-    // }
-    std::cout<< "collapse done" << std::endl;
+    edge = edges_begin();
+    for(int i = 0; i < n; i++) {
+        
+        if(edge->length() < 4 * mean_length / 5) {
+            collapse_edge(edge);
+        }
+        while(eerased.find(edge) != eerased.end()) {
+            edge++;
+        }
+    }
+    do_erase();
     for(auto e = edges_begin(); e != edges_end(); e++) {
-        std::cout<<e->id() << std::endl;
         HalfedgeRef h0 = e->halfedge();
         HalfedgeRef h1 = h0->twin();
         VertexRef v0 = h0->vertex();
@@ -920,20 +919,16 @@ bool Halfedge_Mesh::isotropic_remesh() {
         if(new_dev < cur_dev) {
             flip_edge(e);
         }
-        std::cout<< "??" << std::endl;
     }
-    std::cout << "flip done" << std::endl;
     for (VertexRef v = vertices_begin(); v != vertices_end(); v++) {
         Vec3 c = v->neighborhood_center();
         Vec3 p = v->pos;
         v->new_pos = p + 0.2f * (c - p);
     }
-    std::cout << "smooth done" << std::endl;
 
     for(VertexRef v = vertices_begin(); v != vertices_end(); v++) {
         v->pos = v->new_pos;
     }
-    std::cout << "end" << std::endl;
     return true;
 }
 
