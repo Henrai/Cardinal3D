@@ -47,23 +47,29 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::erase_vertex(Halfedge_Mesh:
     do {
         HalfedgeRef h1 = h;
         HalfedgeRef h2 = h1->twin();
-        HalfedgeRef h3 = h2->next();
-        HalfedgeRef h4 = h3->next();
-        while (h4 != h2) {
-            halfedges.push_back(h4);
-            VertexRef vr = h4->vertex();
-            vr->halfedge() = h4;
-            h4 = h4->next();
+        HalfedgeRef h3 = h2->next()->next();
+        while (h3 != h2) {
+            halfedges.push_back(h3);
+            h3->vertex()->halfedge() = h3;
+            h3 = h3->next();
         }
+
         erase(h1);
         erase(h2);
         erase(h1->edge());
         erase(h2->face());
+        
         h = h->twin()->next();
     } while(h != v->halfedge());
-    erase(v);
-    FaceRef f = new_face();
     
+    erase(v);
+    
+    FaceRef f = new_face();
+    f->halfedge() = halfedges[0];
+    for (size_t i = 0; i < halfedges.size(); i++) {
+        halfedges[i]->face() = f;
+        halfedges[i]->next() = halfedges[i]->twin()->vertex()->halfedge();
+    }
     return f;
 }
 
@@ -73,8 +79,28 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::erase_vertex(Halfedge_Mesh:
  */
 std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::erase_edge(Halfedge_Mesh::EdgeRef e) {
 
-    (void)e;
-    return std::nullopt;
+    HalfedgeRef edges_to_remove[2] = {e->halfedge(), e->halfedge()->twin()};
+    std::vector<HalfedgeRef> halfedges;
+    for(auto i : edges_to_remove) {
+        HalfedgeRef h = i->next();
+        do {
+            halfedges.push_back(h);
+            h->vertex()->halfedge() = h;
+            h = h->next();
+        } while(h != i);
+        erase(h->face());
+    }
+    FaceRef f = new_face();
+    f->halfedge() = halfedges[0];
+
+    for(auto i: halfedges) {
+        i->face() = f;
+        i->next() = i->twin()->vertex()->halfedge();
+    }
+    erase(e);
+    erase(edges_to_remove[0]);
+    erase(edges_to_remove[1]);
+    return f;
 }
 
 /*
