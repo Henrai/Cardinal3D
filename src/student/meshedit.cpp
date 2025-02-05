@@ -319,7 +319,7 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::split_edge_non_boundary(H
     h11->set_neighbors(h10, h12, v3, e3, f2);
     h12->set_neighbors(h5, h11, v5, e3, f3);
     h13->set_neighbors(h12, h6, v0, e0, f3);
-    e2->is_new = true;
+    e1->is_new = true;
     e3->is_new = true;
     h1->next() = h7;
     h2->next() = h9;
@@ -961,14 +961,14 @@ void Halfedge_Mesh::loop_subdivide() {
     }
 
     // Finally, flip any new edge that connects an old and new vertex.
-    // for(EdgeRef e = edges_begin(); e != edges_end(); e++) {
-    //     if(!e->is_new) continue;
-    //     VertexRef v0 = e->halfedge()->vertex();
-    //     VertexRef v1 = e->halfedge()->twin()->vertex();
-    //     if(v0->is_new != v1->is_new) {
-    //         flip_edge(e);
-    //     }
-    // }
+    for(EdgeRef e = edges_begin(); e != edges_end(); e++) {
+        if(!e->is_new) continue;
+        VertexRef v0 = e->halfedge()->vertex();
+        VertexRef v1 = e->halfedge()->twin()->vertex();
+        if(v0->is_new != v1->is_new) {
+            flip_edge(e);
+        }
+    }
     // Copy the updated vertex positions to the subdivided mesh.
     for (VertexRef v = vertices_begin(); v != vertices_end(); v++) {
         v->pos = v->new_pos;
