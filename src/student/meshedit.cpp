@@ -36,9 +36,35 @@
     edges and faces with a single face, returning the new face.
  */
 std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::erase_vertex(Halfedge_Mesh::VertexRef v) {
-
-    (void)v;
-    return std::nullopt;
+    HalfedgeRef h = v->halfedge();
+    std::vector<HalfedgeRef> halfedges;
+    for (auto v = vertices_begin(); v != vertices_end(); v++) {
+        HalfedgeRef t = v->halfedge();
+        do {
+            t = t->twin()->next();
+        } while (t != v->halfedge());
+    } 
+    do {
+        HalfedgeRef h1 = h;
+        HalfedgeRef h2 = h1->twin();
+        HalfedgeRef h3 = h2->next();
+        HalfedgeRef h4 = h3->next();
+        while (h4 != h2) {
+            halfedges.push_back(h4);
+            VertexRef vr = h4->vertex();
+            vr->halfedge() = h4;
+            h4 = h4->next();
+        }
+        erase(h1);
+        erase(h2);
+        erase(h1->edge());
+        erase(h2->face());
+        h = h->twin()->next();
+    } while(h != v->halfedge());
+    erase(v);
+    FaceRef f = new_face();
+    
+    return f;
 }
 
 /*
