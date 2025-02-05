@@ -38,12 +38,6 @@
 std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::erase_vertex(Halfedge_Mesh::VertexRef v) {
     HalfedgeRef h = v->halfedge();
     std::vector<HalfedgeRef> halfedges;
-    for (auto v = vertices_begin(); v != vertices_end(); v++) {
-        HalfedgeRef t = v->halfedge();
-        do {
-            t = t->twin()->next();
-        } while (t != v->halfedge());
-    } 
     do {
         HalfedgeRef h1 = h;
         HalfedgeRef h2 = h1->twin();
@@ -259,7 +253,6 @@ std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(Halfedge_Mesh::Ed
     the edge that was split, rather than the new edges.
 */
 std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::split_edge(Halfedge_Mesh::EdgeRef e) {
-
     if (e->on_boundary()) {
         return split_edge_boundary(e);
     }
