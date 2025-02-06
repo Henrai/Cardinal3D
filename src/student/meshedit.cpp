@@ -776,6 +776,7 @@ void Halfedge_Mesh::catmullclark_subdivide_positions() {
 
     // Vertices
     for (VertexRef v = vertices_begin(); v != vertices_end(); v++) {
+        if(v->on_boundary()) std::cout<<"ahaha"<<std::endl;
         HalfedgeRef h = v->halfedge();
         Vec3 Q = Vec3();
         Vec3 R = Vec3();
@@ -944,6 +945,7 @@ bool Halfedge_Mesh::isotropic_remesh() {
         if(edge->length() < 4.f * mean_length / 5.f) {
             collapse_edge(edge);
         }
+        edge++;
         while(eerased.find(edge) != eerased.end()) {
             edge++;
             i++;
@@ -1229,4 +1231,5 @@ bool Halfedge_Mesh::simplify() {
     edge_records.clear();
     edge_queue.queue.clear();
     return true;
+
 }

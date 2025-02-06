@@ -801,6 +801,7 @@ std::string Model::UIsidebar(Undo& undo, Widgets& widgets, Scene_Maybe obj_opt, 
                                   },
                                   [&](Halfedge_Mesh::EdgeRef edge) {
                                       ImGui::Text("Halfedge: %u", edge->halfedge()->id());
+                                      ImGui::Text("Edge length: %f", edge->length());
                                   },
                                   [&](Halfedge_Mesh::FaceRef face) {
                                       ImGui::Text("Halfedge: %u", face->halfedge()->id());
