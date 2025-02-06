@@ -97,6 +97,42 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::erase_edge(Halfedge_Mesh::E
     return f;
 }
 
+bool Halfedge_Mesh::is_collapsible(Halfedge_Mesh::EdgeRef e) {
+    HalfedgeRef h1 = e->halfedge();
+    HalfedgeRef h2 = e->halfedge()->twin();
+    VertexRef v1 = h1->vertex();
+    VertexRef v2 = h2->vertex();
+
+    if (v1->on_boundary() && v2->on_boundary() && !e->on_boundary()) {
+        return false;
+    }
+
+    int cnt = 2;
+    if(h1->face()->degree() > 3) {
+        cnt--;
+    }
+    if(h2->face()->degree() > 3) {
+        cnt--;
+    }
+
+    HalfedgeRef t1 = h1;
+    do {    
+        HalfedgeRef t2 = h2;
+        do {
+            if(t2->twin()->vertex()->id() == t1->twin()->vertex()->id()) {
+                if(cnt == 0) {
+                    return false;
+                }
+                cnt--;
+            }
+            t2 = t2->twin()->next();
+        } while(t2 != h2);
+        t1 = t1->twin()->next();
+    }while(t1 != h1);
+
+    return true;
+}
+
 /*
     This method should collapse the given edge and return an iterator to
     the new vertex created by the collapse.
@@ -111,8 +147,13 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Me
        D - L - E              D-L-E
     */
 
+    if (!is_collapsible(e)) {
+        return std::nullopt;
+    }
+
     HalfedgeRef start_edges[2] = {e->halfedge(), e->halfedge()->twin()};
     VertexRef start_vertices[2] = {start_edges[0]->vertex(), start_edges[1]->vertex()};
+    
     VertexRef v0 = new_vertex();
     v0->pos = (start_vertices[0]->pos + start_vertices[1]->pos) / 2;
 
@@ -879,27 +920,33 @@ bool Halfedge_Mesh::isotropic_remesh() {
             return false;
         }
     }
+    std::cout << n_faces() << std::endl;
 
     float n = edges.size();
     float mean_length = 0;
     for (auto edge = edges_begin(); edge != edges_end(); edge++) {
-       mean_length += edge->length()/n;
+       mean_length += edge->length();
     }
+    mean_length /= n;
+    std::cout << "mean_length: " << mean_length << std::endl;
     EdgeRef edge = edges_begin();
     for(int i = 0; i < n; i++) {
-        if(edge->length() > 4 * mean_length / 3) {
+        if(edge->length() > 4.f * mean_length / 3.f) {
             split_edge(edge);
         }
         edge++;
     }
+    do_erase();
     edge = edges_begin();
+    n = edges.size();
     for(int i = 0; i < n; i++) {
         
-        if(edge->length() < 4 * mean_length / 5) {
+        if(edge->length() < 4.f * mean_length / 5.f) {
             collapse_edge(edge);
         }
         while(eerased.find(edge) != eerased.end()) {
             edge++;
+            i++;
         }
     }
     do_erase();
@@ -920,14 +967,20 @@ bool Halfedge_Mesh::isotropic_remesh() {
             flip_edge(e);
         }
     }
-    for (VertexRef v = vertices_begin(); v != vertices_end(); v++) {
-        Vec3 c = v->neighborhood_center();
-        Vec3 p = v->pos;
-        v->new_pos = p + 0.2f * (c - p);
-    }
+    for(int i = 0; i < 15; i++)  {
+        for (VertexRef v = vertices_begin(); v != vertices_end(); v++) {
+            Vec3 c = v->neighborhood_center();
+            Vec3 p = v->pos;
+            Vec3 dv = c - p;
+            Vec3 n = v->normal();
+            dv = dv - dot(dv, n) * n;
 
-    for(VertexRef v = vertices_begin(); v != vertices_end(); v++) {
-        v->pos = v->new_pos;
+            v->new_pos = p + dv;
+        }
+
+        for(VertexRef v = vertices_begin(); v != vertices_end(); v++) {
+            v->pos = v->new_pos;
+        }
     }
     return true;
 }
@@ -1082,7 +1135,8 @@ bool Halfedge_Mesh::simplify() {
     // You should use collapse_edge_erase() instead for the desired behavior.
 
     size_t face_count = faces.size();
-    if(face_count < 32) {
+    std::cout<<face_count<<std::endl;
+    if(face_count < 128) {
         return false;
     }
 
@@ -1127,6 +1181,7 @@ bool Halfedge_Mesh::simplify() {
         Edge_Record er = edge_queue.top();
         edge_queue.pop();
         EdgeRef e = er.edge;
+        if (!is_collapsible(e)) continue;
 
         VertexRef v0[2] = { e->halfedge()->vertex(),  e->halfedge()->twin()->vertex()};
         for (VertexRef v : v0) {
@@ -1139,6 +1194,8 @@ bool Halfedge_Mesh::simplify() {
         edge_records.erase(e);
         vertex_quadrics.erase(v0[0]);
         vertex_quadrics.erase(v0[1]);
+
+        
         auto v_container = collapse_edge_erase(e);
         if(!v_container.has_value()) {
             return false;

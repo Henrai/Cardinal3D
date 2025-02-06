@@ -214,6 +214,11 @@ public:
     std::optional<VertexRef> collapse_edge(EdgeRef e);
 
     /*
+        check if an edge is collapsible
+    */
+    bool is_collapsible(EdgeRef e);
+
+    /*
         Collapse a face, returning a pointer to the collapsed vertex
     */
     std::optional<VertexRef> collapse_face(FaceRef f);
