@@ -13,6 +13,11 @@ BBox Triangle::bbox() const {
     // account for that here, or later on in BBox::intersect
 
     BBox box;
+
+    box.enclose(vertex_list[v0].position);
+    box.enclose(vertex_list[v1].position);
+    box.enclose(vertex_list[v2].position);
+    
     return box;
 }
 
@@ -25,23 +30,32 @@ Trace Triangle::hit(const Ray& ray) const {
     Tri_Mesh_Vert v_1 = vertex_list[v1];
     Tri_Mesh_Vert v_2 = vertex_list[v2];
 
+    Trace ret;
     // here just to avoid unused variable warnings, students should remove the following three lines.
-    (void)v_0;
-    (void)v_1;
-    (void)v_2;
+    Vec3 e1 = v_1.position - v_0.position;
+    Vec3 e2 = v_2.position - v_0.position;
+    Vec3 s = ray.point - v_0.position; 
+    float det = -dot(cross(e1, e2), ray.dir);
+
+    if (det == 0) return ret;
+
+    float u = -dot(cross(s, e2), ray.dir) / det;
+    float v = -dot(cross(e1, s), ray.dir) / det;
+    float t = dot(cross(e1, e2), s) / det;
     
+    if (u < 0 || v < 0 || u + v > 1 || t < ray.dist_bounds[0] || t > ray.dist_bounds[1]) return ret;
     // TODO (PathTracer): Task 2
     // Intersect this ray with a triangle defined by the above three points.
     // Intersection should yield a ray t-value, and a hit point (u,v) on the surface of the triangle
 
     // You'll need to fill in a "Trace" struct describing information about the hit (or lack of hit)
 
-    Trace ret;
+    
     ret.origin = ray.point;
-    ret.hit = false;       // was there an intersection?
-    ret.distance = 0.0f;   // at what distance did the intersection occur?
-    ret.position = Vec3{}; // where was the intersection?
-    ret.normal = Vec3{};   // what was the surface normal at the intersection?
+    ret.hit = true;       // was there an intersection?
+    ret.distance = t;   // at what distance did the intersection occur?
+    ret.position = ray.point + t * ray.dir; // where was the intersection?
+    ret.normal = (1 - u - v) * v_0.normal + u * v_1.normal + v * v_2.normal;   // what was the surface normal at the intersection?
                            // (this should be interpolated between the three vertex normals)
     return ret;
 }
