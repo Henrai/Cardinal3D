@@ -15,7 +15,7 @@
 struct BBox {
 
     /// Default min is max float value, default max is negative max float value
-    BBox() : min(FLT_MAX), max(-FLT_MAX) {
+    BBox() : min(FLT_MAX), max(-FLT_MAX), count(0) {
     }
     /// Set minimum and maximum extent
     explicit BBox(Vec3 min, Vec3 max) : min(min), max(max) {
@@ -123,6 +123,7 @@ struct BBox {
     }
 
     Vec3 min, max;
+    int count;
 };
 
 inline std::ostream& operator<<(std::ostream& out, BBox b) {

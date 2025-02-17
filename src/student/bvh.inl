@@ -2,8 +2,13 @@
 #include "../rays/bvh.h"
 #include "debug.h"
 #include <stack>
+#include <iostream>
+#include <cstdlib>
+#include <ctime>
 
 namespace PT {
+
+#define BUCKET_SIZE 16
 
 // construct BVH hierarchy given a vector of prims
 template<typename Primitive>
@@ -72,45 +77,96 @@ void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size)
     node.start = 0;
     node.size = primitives.size();
 
-    // Create bounding boxes for children
-    BBox split_leftBox;
-    BBox split_rightBox;
+    build(root_node_addr, max_leaf_size);
+}
 
-    // compute bbox for left child
-    Primitive& p = primitives[0];
-    BBox pbb = p.bbox();
-    split_leftBox.enclose(pbb);
+template<typename Primitive>
+void BVH<Primitive>::Node::find_best_split(float& target_pos, int& target_axis, const std::vector<Primitive>& primitives ) const {
+    float min_cost = INT_MAX;
+    float parent_area = bbox.surface_area();
+    for(int axis = 0; axis < 3; axis++) {
+        BBox buckets[BUCKET_SIZE];
+        float bounds_start = bbox.min[axis];
+        float bounds_length = bbox.max[axis] - bbox.min[axis];
+        float bucket_step = bounds_length / BUCKET_SIZE;
+        for (size_t i = start; i < start + size; i++) {
+            int bucket_index = (primitives[i].bbox().center()[axis] - bounds_start) / bucket_step;
 
-    // compute bbox for right child
-    for(size_t i = 1; i < primitives.size(); ++i) {
-        Primitive& p = primitives[i];
-        BBox pbb = p.bbox();
-        split_rightBox.enclose(pbb);
+            buckets[bucket_index].enclose(primitives[i].bbox());
+            buckets[bucket_index].count++;
+        }
+        BBox prefix[BUCKET_SIZE];
+        BBox suffix[BUCKET_SIZE];
+        prefix[0] = buckets[0];
+        for (int i = 1; i < BUCKET_SIZE; i++) {
+            prefix[i].enclose(buckets[i]);
+            prefix[i].enclose(prefix[i - 1]);
+            prefix[i].count = buckets[i].count +  prefix[i - 1].count;
+        }
+
+        suffix[BUCKET_SIZE - 1] = buckets[BUCKET_SIZE - 1];
+        for(int i = BUCKET_SIZE - 2; i >= 0; i--) {
+            suffix[i].enclose(buckets[i]);
+            suffix[i].enclose(suffix[i + 1]);
+            suffix[i].count = buckets[i].count + suffix[i + 1].count;
+        }
+        
+        for(int i = 0; i < BUCKET_SIZE - 2; i++) {
+            float left_area = prefix[i].surface_area();
+            float right_area = suffix[i+1].surface_area();
+            float cost = (left_area / parent_area) * prefix[i].count + (right_area / parent_area) * suffix[i + 1].count;
+            if(cost < min_cost) {
+                min_cost = cost;
+                target_axis = axis;
+                target_pos = bounds_start + bucket_step * (i+1);
+            }
+        }
     }
 
-    // Note that by construction in this simple example, the primitives are
-    // contiguous as required. But in the students real code, students are
-    // responsible for reorganizing the primitives in the primitives array so that
-    // after a SAH split is computed, the chidren refer to contiguous ranges of primitives.
+}
 
-    size_t startl = 0;  // starting prim index of left child
-    size_t rangel = 1;  // number of prims in left child
-    size_t startr = startl + rangel;  // starting prim index of right child
-    size_t ranger = primitives.size() - rangel; // number of prims in right child
+template<typename Primitive>
+int BVH<Primitive>::split_node(float target, int axis, int start, int size) {
+    int left = 0;
+    int right = size - 1;
+    while(left <= right) {
+        while(primitives[start + left].bbox().center()[axis] < target) {
+            left++;
+        } 
+        while(primitives[start + right].bbox().center()[axis] >= target) {
+            right--;
+        }
+        std::swap(primitives[start + left], primitives[start + right]);
+    }
+    return left;
+}
 
-    // create child nodes
-    size_t node_addr_l = new_node();
-    size_t node_addr_r = new_node();
-    nodes[root_node_addr].l = node_addr_l;
-    nodes[root_node_addr].r = node_addr_r;
+template<typename Primitive>
+void BVH<Primitive>::build(size_t node_addr, size_t max_leaf_size) {
 
-    nodes[node_addr_l].bbox = split_leftBox;
-    nodes[node_addr_l].start = startl;
-    nodes[node_addr_l].size = rangel;
+    Node node = nodes[node_addr];
+    if(node.size <= max_leaf_size) {
+        return;
+    }
+    int target_axis = -1;
+    float target_pos = 0.0f;
+    nodes[node_addr].find_best_split(target_pos, target_axis, primitives);
+    int split = split_node(target_pos,target_axis, node.start, node.size);
+    BBox split_leftBox;
+    BBox split_rightBox;
+    for (size_t i = node.start; i < node.start + split; i++) {
+        split_leftBox.enclose(primitives[i].bbox());
+    }
+    for (size_t i = node.start + split; i < node.start + node.size; i++) {
+        split_rightBox.enclose(primitives[i].bbox());
+    }
+    size_t node_addr_l = new_node(split_leftBox, node.start, split);
+    size_t node_addr_r = new_node(split_rightBox, node.start + split, node.size - split);
+    nodes[node_addr].l = node_addr_l;
+    nodes[node_addr].r = node_addr_r;
 
-    nodes[node_addr_r].bbox = split_rightBox;
-    nodes[node_addr_r].start = startr;
-    nodes[node_addr_r].size = ranger;
+    build(node_addr_l, max_leaf_size);
+    build(node_addr_r, max_leaf_size);
 }
 
 template<typename Primitive>
@@ -193,6 +249,7 @@ size_t BVH<Primitive>::visualize(GL::Lines& lines, GL::Lines& active, size_t lev
     while(!tstack.empty()) {
 
         auto [idx, lvl] = tstack.top();
+        
         max_level = std::max(max_level, lvl);
         const Node& node = nodes[idx];
         tstack.pop();

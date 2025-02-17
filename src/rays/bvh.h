@@ -13,6 +13,7 @@ public:
     BVH() = default;
     BVH(std::vector<Primitive>&& primitives, size_t max_leaf_size = 1);
     void build(std::vector<Primitive>&& primitives, size_t max_leaf_size = 1);
+    
 
     BVH(BVH&& src) = default;
     BVH& operator=(BVH&& src) = default;
@@ -29,14 +30,18 @@ public:
     std::vector<Primitive> destructure();
     void clear();
 
+    int split_node(float target, int axis, int start, int size);
+
 private:
     class Node {
         BBox bbox;
         size_t start, size, l, r;
 
         bool is_leaf() const;
+        void find_best_split(float& target_pos, int& target_axis, const std::vector<Primitive>& primitives) const;
         friend class BVH<Primitive>;
     };
+    void build(size_t node_addr, size_t max_leaf_size);
     size_t new_node(BBox box = {}, size_t start = 0, size_t size = 0, size_t l = 0, size_t r = 0);
 
     std::vector<Node> nodes;
