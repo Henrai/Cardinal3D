@@ -147,7 +147,6 @@ void BVH<Primitive>::build(size_t node_addr, size_t max_leaf_size) {
     BBox target_right_box;
     float target_pos = node.find_best_split(target_axis, target_left_box, target_right_box, primitives);
 
-   
     std::partition(primitives.begin() + node.start, primitives.begin() + node.start + node.size, 
         [target_pos, target_axis](Primitive& prim) {
             return prim.bbox().center()[target_axis] < target_pos;
@@ -194,10 +193,13 @@ Trace BVH<Primitive>::hit(const Ray& ray, size_t node_addr, Vec2& times) const {
         return ret;
     }
 
-    Vec2 left_times = times;
-    Vec2 right_times = times;
+    
     int node_addr_l = node.l;
     int node_addr_r = node.r;
+    
+    Vec2 left_times = times;
+    Vec2 right_times = times;
+    
     bool is_hit_left = nodes[node_addr_l].bbox.hit(ray, left_times);
     bool is_hit_right = nodes[node_addr_r].bbox.hit(ray, right_times);
 

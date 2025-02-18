@@ -21,6 +21,8 @@ bool BBox::hit(const Ray& ray, Vec2& times) const {
     float t_far = std::min(std::min(t2.x, t2.y), t2.z);
 
     if (t_near > t_far || t_far < 0) return false;
+    if (t_near > ray.dist_bounds[1] || t_far < ray.dist_bounds[0]) return false;
+
 
     times.x = t_near;
     times.y =  t_far;
