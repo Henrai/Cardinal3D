@@ -76,7 +76,6 @@ void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size)
     node.bbox = bb;
     node.start = 0;
     node.size = primitives.size();
-
     build(root_node_addr, max_leaf_size);
 }
 
@@ -90,7 +89,6 @@ float BVH<Primitive>::Node::find_best_split(
     float target_pos = 0.0f;
 
     BBox buckets[BUCKET_SIZE];
-    
     for (int axis = 0; axis < 3; axis++) {
         for(int i = 0; i < BUCKET_SIZE; i++) {
             buckets[i].reset();
@@ -102,14 +100,17 @@ float BVH<Primitive>::Node::find_best_split(
 
         for(size_t i = start; i < start + size; i++) {
             int bucket_index = (primitives[i].bbox().center()[axis] - bounds_start) / bucket_step;
+            bucket_index = std::min(bucket_index, BUCKET_SIZE - 1);
             buckets[bucket_index].enclose(primitives[i].bbox());
             buckets[bucket_index].count++;
         }
-
         for(int i = 1; i < BUCKET_SIZE - 1; i++) {
             BBox left_box = BBox();
             BBox right_box = BBox();
             for(int j = 0; j < BUCKET_SIZE; j++) {
+                if(buckets[j].count == 0) {
+                    continue;
+                }
                 if(j < i) {
                     left_box.enclose(buckets[j]);
                     left_box.count += buckets[j].count;
@@ -129,6 +130,7 @@ float BVH<Primitive>::Node::find_best_split(
                 target_right_box = right_box;
             }
         }
+
     }
     return target_pos;
 }
@@ -143,18 +145,18 @@ void BVH<Primitive>::build(size_t node_addr, size_t max_leaf_size) {
     int target_axis = -1;
     BBox target_left_box;
     BBox target_right_box;
+    float target_pos = node.find_best_split(target_axis, target_left_box, target_right_box, primitives);
 
-    float target_pos = node.find_best_split(target_axis, target_left_box, target_right_box, primitives);    
+   
     std::partition(primitives.begin() + node.start, primitives.begin() + node.start + node.size, 
         [target_pos, target_axis](Primitive& prim) {
             return prim.bbox().center()[target_axis] < target_pos;
         });
-
-
     size_t node_addr_l = new_node(target_left_box, node.start, target_left_box.count);
     size_t node_addr_r = new_node(target_right_box, node.start + target_left_box.count, target_right_box.count);
     nodes[node_addr].l = node_addr_l;
     nodes[node_addr].r = node_addr_r;
+
 
     build(node_addr_l, max_leaf_size);
     build(node_addr_r, max_leaf_size);
