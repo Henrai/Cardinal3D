@@ -123,7 +123,7 @@ Spectrum Pathtracer::trace_ray(const Ray& ray) {
                 
                 bool visibility = !scene.hit(shadow_ray).hit;
                 
-                radiance_out += visibility *(cos_theta / (samples * sample.pdf)) * sample.radiance * attenuation;
+                radiance_out += visibility * (cos_theta / (samples * sample.pdf)) * sample.radiance * attenuation;
             }
         };
 
@@ -145,20 +145,49 @@ Spectrum Pathtracer::trace_ray(const Ray& ray) {
     // (1) Ray objects have a depth field; if it reaches max_depth, you should
     // terminate the path.
 
+    if(ray.depth > max_depth) return radiance_out;
+
     // (2) Randomly select a new ray direction (it may be reflection or transmittance
     // ray depending on surface type) using bsdf.sample()
+
+    BSDF_Sample sample = bsdf.sample(out_dir);
 
     // (3) Compute the throughput of the recursive ray. This should be the current ray's
     // throughput scaled by the BSDF attenuation, cos(theta), and BSDF sample PDF.
     // Potentially terminate the path using Russian roulette as a function of the new throughput.
     // Note that allowing the termination probability to approach 1 may cause extra speckling.
 
+    float cos_theta = sample.direction.y;
+    Spectrum throughput = ray.throughput * sample.attenuation * cos_theta / sample.pdf;
+
+    float terminate_prob = 1.0f - std::max(throughput.luma(), 0.05f);
+    if(RNG::coin_flip(terminate_prob)) {
+        return radiance_out;
+    }
+    
+
     // (4) Create new scene-space ray and cast it to get incoming light. As with shadow rays, you
     // should modify time_bounds so that the ray does not intersect at time = 0. Remember to
     // set the new throughput and depth values.
+    Vec3 in_dir = world_to_object.rotate(sample.direction);
+    Ray in_ray(hit.position, in_dir);
+    in_ray.depth = ray.depth + 1;
+    in_ray.throughput = throughput;
+    in_ray.dist_bounds.x = EPS_F;
+    Spectrum incoming = trace_ray(in_ray);
+
+
 
     // (5) Add contribution due to incoming light with proper weighting. Remember to add in
     // the BSDF sample emissive term.
+    if(ray.depth == 0) {
+        radiance_out += sample.emissive;
+    }
+    radiance_out += incoming * sample.attenuation * cos_theta / sample.pdf;
+    
+    radiance_out = radiance_out / (1.0f - terminate_prob);
+
+
     return radiance_out;
 }
 
