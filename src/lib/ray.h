@@ -43,7 +43,7 @@ struct Ray {
     Spectrum throughput = Spectrum(1.0f);
     /// Recursive depth of ray
     size_t depth = 0;
-
+    bool is_diffuse = true;
     /// The minimum and maximum distance at which this ray can encounter collisions
     /// note that this field is mutable, meaning it can be changed on const Rays
     mutable Vec2 dist_bounds = Vec2(0.0f, std::numeric_limits<float>::infinity());

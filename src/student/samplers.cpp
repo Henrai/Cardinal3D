@@ -3,6 +3,7 @@
 #include "../util/rand.h"
 #include "debug.h"
 
+#include <iostream>
 namespace Samplers {
 
 Vec2 Rect::Uniform::sample(float& pdf) const {
@@ -28,9 +29,9 @@ Vec3 Hemisphere::Cosine::sample(float& pdf) const {
     float r = std::sqrt(RNG::unit());
     float theta = 2.0f * PI_F * RNG::unit();
     float x = r * cos(theta);
-    float y = r * sin(theta);
-    float z = std::sqrt(std::max(0.0f, 1.0f - x * x - y * y));
-    pdf = z / PI_F;
+    float z = r * sin(theta);
+    float y = std::sqrt(std::max(0.0f, 1.0f - r*r));
+    pdf = y / PI_F;
     return Vec3(x, y , z);
 }
 
